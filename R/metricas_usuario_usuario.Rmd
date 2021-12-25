@@ -1,0 +1,709 @@
+---
+title: "Análisis Red Usuarios-Usuarios"
+output:
+  html_document:
+    df_print: paged
+---
+```{r}
+library(igraph)
+library(centiserve)
+```
+
+# Carga de Datos
+```{r}
+BF_user_user <- read.csv("../DatosKaggle/BuzzFeed/sample/BuzzFeedUserUser_sample_20210815.csv",
+                         header = FALSE,
+                         col.names = c("id_source", "id_target"))
+BF_user_user <- graph.data.frame(BF_user_user, directed = TRUE)
+```
+
+## Analisis de los componentes de la red
+```{r}
+connected_components = components(BF_user_user)
+connected_components$no
+connected_components$csize
+```
+La red contiene 14 componete. Cada componente contiene diferente cantidad de nodos, pero la componente más grande contiene 2526 nodos, mientras que el resto de las componentes tienen 5 o 2 nodos.
+
+# Medidas de Centralidad Basadas en Primeros Vecinos
+
+## In Degree & Out Degree
+```{r dpi=400, fig.width = 8, fig.height = 5}
+in_degree = degree(BF_user_user, mode = "in")
+max(in_degree)
+hist(in_degree, labels = TRUE, xlim = c(0,200), ylim = c(0,1900), xlab = "In Degree", main = "Histograma de los In Degree - Red Usuarios-Usuarios")
+```
+
+```{r dpi=400, fig.width = 10, fig.height = 6}
+
+V(BF_user_user)$in_degree <- in_degree
+
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "Maroon 2",
+                                 "Purple",
+                                 "red",
+                                 "Deep Pink 2",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold",
+                                 "yellow",
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2",
+                                 "Blue 1"))
+colors <- colorfunc(max(in_degree))
+V(BF_user_user)$color <- colors[in_degree + 1]
+V(BF_user_user)$shape <- "circle"
+E(BF_user_user)$color <- "lightgray"
+
+plot(BF_user_user, 
+     vertex.label = NA,
+     vertex.size = 4,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main= "Red Usuario-Usuario: In Degree")
+```
+
+
+```{r}
+out_degree = degree(BF_user_user, mode = "out")
+max(out_degree)
+hist(out_degree, labels = TRUE, xlim = c(0,600), ylim = c(0,3000), xlab = "In Degree", main = "Histograma de los In Degree - Red Usuarios-Usuarios")
+```
+
+```{r dpi=400, fig.width = 10, fig.height = 6}
+
+V(BF_user_user)$in_degree <- out_degree
+
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "Maroon 2",
+                                 "Purple",
+                                 "red",
+                                 "Deep Pink 2",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold",
+                                 "yellow",
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2",
+                                 "Blue 1"))
+colors <- colorfunc(max(out_degree))
+V(BF_user_user)$color <- colors[out_degree + 1]
+V(BF_user_user)$shape <- "circle"
+E(BF_user_user)$color <- "lightgray"
+
+plot(BF_user_user, 
+     vertex.label = NA,
+     vertex.size = 4,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main= "Red Usuario-Usuario: Out Degree")
+```
+
+## Degree Centrality
+```{r}
+degree_centrality = degree(BF_user_user)
+hist(degree_centrality, labels = TRUE, xlim = c(0,600), ylim = c(0,3000), xlab = "Degree Centrality", main = "Histograma de Degree Centrality - Red Usuarios-Usuarios")
+```
+
+```{r dpi=400, fig.width = 10, fig.height = 6}
+
+V(BF_user_user)$degree_centrality <- degree_centrality
+
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "Maroon 2",
+                                 "Purple",
+                                 "red",
+                                 "Deep Pink 2",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold",
+                                 "yellow",
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2",
+                                 "Blue 1"))
+colors <- colorfunc(max(degree_centrality))
+V(BF_user_user)$color <- colors[degree_centrality + 1]
+V(BF_user_user)$shape <- "circle"
+E(BF_user_user)$color <- "lightgray"
+
+plot(BF_user_user, 
+     vertex.label = NA,
+     vertex.size = 4,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main= "Red Usuario-Usuario: Degree Centrality")
+```
+
+## Eigenvector Centrality
+
+Esta métrica nos da una intuicion de la influecia que un nodo tiene en la red. Si un nodo es alcanzado por muchos otros nodos (que ademas tienen una alta eigenvector centrality) ese nodo va a tener un eigenvector centrality mayor
+
+Podriamos decir que eigenvector centrality calcula el acceso indirecto al poder de unn determinado nodo
+```{r}
+eigenvector_cetrality <- evcent(BF_user_user)$vector
+eigenvector_cetrality
+```
+
+```{r}
+hist(eigenvector_cetrality, labels = TRUE, ylim = c(0,2500), xlab = "Eigenvector Centrality", main = "Histograma de los Valores de Eigenvector Centrality - Red Usuarios-Usuarios")
+```
+
+```{r dpi=400, fig.width = 10, fig.height = 6}
+
+V(BF_user_user)$eigenvector_cetrality <- eigenvector_cetrality
+
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "red",
+                                 "Deep Pink 2",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold",
+                                 "yellow",
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2",
+                                 "Blue 1"))
+scaled_eigen = eigenvector_cetrality * 10000
+colors <- colorfunc(max(scaled_eigen))
+V(BF_user_user)$color <- colors[scaled_eigen + 1]
+V(BF_user_user)$shape <- "circle"
+E(BF_user_user)$color <- "lightgray"
+
+plot(BF_user_user, 
+     vertex.label = NA,
+     vertex.size = 4,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main= "Red Usuario-Usuario: Eigenvector Centrality")
+```
+
+
+## Katz Centrality
+```{r}
+katzcentrality = katzcent(BF_user_user, vids = V(BF_user_user), alpha = 0.1)
+katzcentrality
+```
+
+
+```{r}
+hist(katzcentrality, labels = TRUE, ylim = c(0,2500), xlab = "Katz Centrality", main = "Histograma de los Valores de Katz Centrality - Red Usuarios-Usuarios")
+```
+
+```{r dpi=400, fig.width = 10, fig.height = 6}
+
+V(BF_user_user)$katz_centrality <- katzcentrality
+
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "red",
+                                 "Deep Pink 2",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold",
+                                 "yellow",
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2",
+                                 "Blue 1"))
+colors <- colorfunc(max(katzcentrality))
+V(BF_user_user)$color <- colors[katzcentrality + 1]
+V(BF_user_user)$shape <- "circle"
+E(BF_user_user)$color <- "lightgray"
+
+plot(BF_user_user, 
+     vertex.label = NA,
+     vertex.size = 4,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main= "Red Usuario-Usuario: Katz Centrality")
+```
+
+
+## Pagerank Centrality
+```{r}
+page_rank = page.rank(BF_user_user)$vector
+page_rank
+```
+
+```{r}
+hist(page_rank, labels = TRUE, ylim = c(0,2500), xlim = c(0,0.005), xlab = "PageRank Centrality", main = "Histograma de los Valores de PageRank Centrality - Red Usuarios-Usuarios")
+```
+
+```{r dpi=400, fig.width = 10, fig.height = 6}
+
+V(BF_user_user)$page_rank <- page_rank
+
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "red",
+                                 "Deep Pink 2",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold",
+                                 "yellow",
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2",
+                                 "Blue 1"))
+scaled_page_rank = page_rank * 1000
+colors <- colorfunc(max(scaled_page_rank))
+V(BF_user_user)$color <- colors[scaled_page_rank + 1]
+V(BF_user_user)$shape <- "circle"
+E(BF_user_user)$color <- "lightgray"
+
+plot(BF_user_user, 
+     vertex.label = NA,
+     vertex.size = 4,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main= "Red Usuario-Usuario: Page Rank Centrality")
+```
+
+
+## Authorities & Hubs
+
+### Authorities
+```{r}
+authority = authority.score(BF_user_user)$vector
+authority
+```
+
+```{r}
+hist(authority, labels = TRUE, ylim = c(0,2500), xlim = c(0,1), xlab = "Authority Score", main = "Histograma de los Valores de Authority Score - Red Usuarios-Usuarios")
+```
+
+
+```{r dpi=600, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "red",
+                                 "Deep Pink 2",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold",
+                                 "yellow",
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2",
+                                 "Blue 1"))
+scaled_authority = authority *100
+colors <- colorfunc(max(scaled_authority))
+V(BF_user_user)$color <- colors[scaled_authority + 1]
+
+V(BF_user_user)$shape <- "circle"
+E(BF_user_user)$color <- "lightgray"
+
+plot(BF_user_user, 
+     vertex.label = NA,
+     vertex.size = 4,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main= "Red Usuario-Usuario: Authority Scores")
+```
+
+### Hubs
+```{r}
+hubs = hub.score(BF_user_user)$vector
+hubs
+```
+
+```{r}
+hist(hubs, labels = TRUE, ylim = c(0,2500), xlim = c(0,1), xlab = "Hub Score", main = "Histograma de los Valores de Hub Score - Red Usuarios-Usuarios")
+```
+
+```{r dpi=600, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "red",
+                                 "Deep Pink 2",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold",
+                                 "yellow",
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2",
+                                 "Blue 1"))
+scaled_hubs = hubs * 10000
+colors <- colorfunc(max(scaled_hubs))
+V(BF_user_user)$color <- colors[scaled_hubs + 1]
+
+V(BF_user_user)$shape <- "circle"
+E(BF_user_user)$color <- "lightgray"
+
+plot(BF_user_user, 
+     vertex.label = NA,
+     vertex.size = 4,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main= "Red Usuario-Usuario: Hub Scores")
+```
+
+
+
+# Medidas de Centralidad Basadas en Caminos mas Cortos
+
+## Closeness Centrality
+
+Dada la existencia nodos que no forman parte de la componente conexa mas grande, decidimos no analizar esta métrica 
+```{r}
+closeness_centrality = closeness(BF_user_user)
+closeness_centrality
+```
+
+```{r}
+hist(closeness_centrality, labels = TRUE, ylim = c(0,2500), xlim = c(0, 0.000005), xlab = "Closeness Centrality", main = "Histograma de los Valores de Closeness Centrality - Red Usuarios-Usuarios")
+```
+
+## Betweennses Centrality
+```{r}
+betweenness_centrality <- betweenness(BF_user_user)
+betweenness_centrality
+```
+
+```{r}
+hist(betweenness_centrality, labels = TRUE, ylim = c(0,3000), xlim = c(0,30000), xlab = "Betweenness Centrality", main = "Histograma de los Valores de Betweenness Centrality - Red Usuarios-Usuarios")
+```
+
+Graficamos a continuación la red de Usuarios-Usuarios donde cada nodo tiene el tamaño y color asociado a la métrica de betweenness calculada anteriormente.
+
+```{r dpi=600, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "red",
+                                 "Deep Pink 2",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold",
+                                 "yellow",
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2",
+                                 "Blue 1"))
+scaled_betweenness = betweenness_centrality / 20
+colors <- colorfunc(max(scaled_betweenness))
+V(BF_user_user)$color <- colors[scaled_betweenness + 1]
+
+V(BF_user_user)$shape <- "circle"
+E(BF_user_user)$color <- "lightgray"
+
+plot(BF_user_user, 
+     vertex.label = NA,
+     vertex.size = 4,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main= "Red Usuario-Usuario: Betweenness")
+```
+
+
+# Medidas Sobre Conjuntos de Nodos
+
+## Cliques
+
+### Calculo de la distribucion de cliques
+
+Análisis de la distribución de cliques. Si bien R muestra warnings debido a que la red es dirigida, realizamos el siguiente análisis de igual manera con esta red dirigida ya que los resultados arrojados, sea la red dirigida o no, son los mismos. Debido a que no queremos introducir un análisis duplicado sobre el mismo tema, decidimos incluir en este reporte sólo los resultados del análisis de cliques para la red dirigida.
+
+```{r}
+count_max_cliques(BF_user_user)
+```
+
+La red contiene 16374 cliques.
+
+```{r}
+clique_3 = count_max_cliques(BF_user_user, min=3)
+clique_3
+clique_4 = count_max_cliques(BF_user_user, min=4)
+clique_4
+clique_5 = count_max_cliques(BF_user_user, min=5)
+clique_5
+clique_6 = count_max_cliques(BF_user_user, min=6)
+clique_6
+```
+Analizando más en profundidad, podemos observar analiticamente que la red tiene cliques de diferentes tamaños. Más especificamente existen:
+-  11849 cliques de tamaño 3 o mayor
+-  2867 cliques de tamaño 4 o mayor
+-  191 cliques de tamaño 5 o mayor
+-  2 cliques de tamaño 6 o mayor
+
+Esto lo podemos ver graficamente mediante un histograma.
+
+### Tamaño de los Cliques de la Red
+```{r}
+total_cliques = max_cliques(BF_user_user) 
+cliques_sizes = unlist(lapply(total_cliques, length))
+h = hist(cliques_sizes, 
+         ylim=c(0,15000),
+         breaks = 5,
+         xlab = "Tamaño de los cliques", 
+         ylab = "Frecuencia", 
+         main = "Distribucion del tamaño de los cliques" ) 
+
+text(h$mids,h$counts,labels=h$counts, adj=c(0.5, -0.5))
+
+```
+
+### Gáfico de los Cliques más Grandes
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+largestCliques <- largest_cliques(BF_user_user)
+
+largestClique_1 = largestCliques[[1]]
+induces_sub_g_1 = induced_subgraph(BF_user_user, largestClique_1)
+induces_sub_g_1_degree = degree(induces_sub_g_1)
+V(induces_sub_g_1)$color <- "Steel Blue 1"
+
+plot(induces_sub_g_1,
+     vertex.label = as.vector(largestClique_1),
+     layout=layout_components,
+     edge.arrow.size=0.5,
+     vertex.size = 20)
+
+
+largestClique_2 = largestCliques[[2]]
+induces_sub_g_2 = induced_subgraph(BF_user_user, largestClique_2)
+induces_sub_g_2_degree = degree(induces_sub_g_2)
+V(induces_sub_g_2)$color <- "Slate Blue 1"
+
+plot(induces_sub_g_2,
+     vertex.label = as.vector(largestClique_2),
+     layout=layout_components,
+     edge.arrow.size=0.5,
+     vertex.size = 20)
+```
+
+# Medidas Globales
+
+## Eccentricity
+El eccentricity de un nodo es el maximo de las distancias mas cortas de un nodo a otro nodo en un grafo
+
+```{r}
+eccentricity_metric = eccentricity(BF_user_user)
+h = hist(eccentricity_metric, 
+         ylim=c(0,2000),
+         breaks = 5,
+         xlab = "Eccentricity", 
+         ylab = "Frecuencia", 
+         main = "Distribucion de Eccentricity" ) 
+
+text(h$mids,h$counts,labels=h$counts, adj=c(0.5, -0.5))
+```
+
+### Radio
+Calculado obteniendo el minimo valor de eccentricity
+```{r}
+min(eccentricity_metric)
+radius(BF_user_user)
+```
+El camino mas corto de un nodo a otro esta a distancia 1.
+
+### Diametro
+```{r}
+diameter(BF_user_user, directed = TRUE, unconnected = TRUE)
+max(eccentricity(BF_user_user))
+```
+El máximo camino mas corto entre dos nodos esta a distancia 14.
+
+En este caso vemos que difiere el resultado dela métrica. Esto es porque la red es dirigida pero la funcion eccentricity hace el calculo como si la red no fuese dirigida.
+
+
+## Average Path Length
+```{r}
+avg_path_length = mean_distance(BF_user_user, directed=TRUE)
+avg_path_length
+```
+
+Average path length calcula la longitud de todos los caminos más cortos desde o hacia los vértices de la red. La interpretación de este resultado es que el promedio de los caminos mas cortos en la red de un nodo a otro esta a tres pasos de distancia, lo cual ,teniendo en cuenta que es una red de 2555, nos indica la buena conectividad que existe entre los nodos de la red.
+
+## Transitivity
+```{r}
+transitivity(BF_user_user, type = "average")
+```
+
+La transitividad global es de 0.13, lo cual nos da una intuición de que la cantidad de nodos asociados de a tres en la red es baja.
+
+## Coeficiente de Reciprocidad 
+```{r}
+reciprocity(BF_user_user)
+```
+
+Este valor nos indica que en la red no hay conexiones bidireccionales entre los nodos.
+
+# Subredes
+
+
+## K-Core
+La funcion coreness nos da una tabla indicando que core pertenece a cada nodo
+
+```{r}
+coreness(BF_user_user)
+```
+
+Coreness nos devuelve una tabla en la cual se listan a que core pertenece cada nodo.
+
+A continuación graficamos la red. Cada nodo tiene el color asignado según core obtenido mediante la función de coreness. Los nodos con valores mas altos, son los nodos que están más densamente conectados.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+kcore <- coreness(BF_user_user)    # Extraemos k-cores
+V(BF_user_user)$core <- kcore      # Agregamos los k-cores calculados como atributo de los nodos
+
+colorfunc <- colorRampPalette(c( "Red 2",
+                                 "lightcoral",
+                                 "tomato", 
+                                 "orange",
+                                 "Cadet Blue 1",
+                                 "Yellow 3",
+                                 "gold", 
+                                 "lightgreen",
+                                 "Light Steel Blue 2",
+                                 "Royal Blue 1",
+                                 "Deep Sky Blue 1",
+                                 "Slate Blue"))
+colors <- colorfunc(max(kcore))
+V(BF_user_user)$color <- colors[kcore]
+
+plot(BF_user_user, 
+     vertex.size = 3,
+     vertex.label = NA,
+     edge.arrow.size=0.01,
+     layout = layout_components,
+     main = "Red Usuario-Usuario: Nodos Según K Core")
+```
+
+En este gráfico, vemos la red de usuarios usuarios. Cada nodo tiene un color asignado el cual depende del core al que pertenezca cada nodo.
+
+## Extracción del K Core mas grande
+
+```{r}
+table(kcore)
+```
+
+El valor mas grande es el 1. Esto quiere decir que todos los nodos con un valor de K-core de uno conforman la parte de la red mas densamente conectada.
+
+
+Graficamos ahora el subgrafo inducido de orden uno para la red usuarios usuarios y analizamos su degree
+
+```{r fig.height=6, fig.width=12}
+egog = make_ego_graph(BF_user_user, order=1)
+k_g = egog[[1]]
+degree_k_g = degree(k_g, mode = "in")
+
+colorfunc <- colorRampPalette(c( "Red 2",
+                                 "lightcoral",
+                                 "tomato", 
+                                 "orange",
+                                 "Cadet Blue 1",
+                                 "Yellow 3",
+                                 "gold", 
+                                 "lightgreen",
+                                 "Light Steel Blue 2",
+                                 "Royal Blue 1",
+                                 "Deep Sky Blue 1",
+                                 "Slate Blue"))
+scaled_degree = degree_k_g + 1
+colors <- colorfunc(max(scaled_degree))
+V(k_g)$color <- colors[scaled_degree]
+
+
+plot(k_g, 
+     vertex.size = 12,
+     vertex.label = degree_k_g,
+     edge.arrow.size=0.3,
+     layout = layout_components,
+     main = "Subgrafo Inducido Usuario-Usuario: Nodos Según In Degree")
+
+```
+
+La escala de colores esta directamente asociada al valor del degree, cuyo valor se puede apreciar como etiqueta de los nodos. Los nodos con un in degree bajo, estan coloreados en la gama de los rojos, mientras que los que tienen un in degree mas alto estan coloreados en violeta. En este caso observamos un nodo central, cuyo id es 31 y su in degree es de 22. Este es el valor mas alto de in degree de la red.
+
+
+```{r fig.height=6, fig.width=12}
+degree_k_g = degree(k_g, mode = "out")
+
+colorfunc <- colorRampPalette(c( "Red 2",
+                                 "lightcoral",
+                                 "tomato", 
+                                 "orange",
+                                 "Cadet Blue 1",
+                                 "Yellow 3",
+                                 "gold", 
+                                 "lightgreen",
+                                 "Light Steel Blue 2",
+                                 "Royal Blue 1",
+                                 "Deep Sky Blue 1",
+                                 "Slate Blue"))
+scaled_degree = degree_k_g + 1
+colors <- colorfunc(max(scaled_degree))
+V(k_g)$color <- colors[scaled_degree]
+
+plot(k_g, 
+     vertex.size = 12,
+     vertex.label = degree_k_g,
+     edge.arrow.size=0.4,
+     layout = layout_components,
+     main = "Red Usuario-Usuario: Nodos Según Out Degree")
+
+```
+
+
+En este caso mantenemos la gama de colores pero cambiamos la representacion. Ahora analizamos el out degree. Los nodos con un out degree bajo, estan coloreados en la gama de los rojos, mientras que los que tienen un out degree mas alto estan coloreados en violeta. Nuevamente, en este caso es sólo un nodo, cuyo id es 31, el que presenta el outdegree mas alto de 142.

@@ -1,0 +1,51 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(igraph)
+```
+```{r}
+set.seed(42)
+
+BF_user_user <- read.graph("../DatosKaggle/BuzzFeed/BuzzFeedUserUser.txt", format = "ncol", directed = F)
+
+nodes_to_delete = sample(V(BF_user_user), as.integer(12000)) 
+
+
+# Save sampled nodes in a list
+node_list = c()
+
+for (i in 1:length(nodes_to_delete)){
+  node_list[i] = nodes_to_delete[i]
+
+}
+```
+
+
+```{r}
+
+length(V(BF_user_user))
+length(E(BF_user_user))
+
+
+BF_user_user = delete_vertices(BF_user_user, as.character(nodes_to_delete))
+
+length(V(BF_user_user))
+length(E(BF_user_user))
+
+# Analizamos si quedaron nodos con degree 0 luego de hacer el sampling. Si es asi, los removemos de la red
+Isolated = which(degree(BF_user_user)==0)
+sum(Isolated)
+BF_user_user = delete_vertices(BF_user_user, Isolated)
+plot(BF_user_user, layout = layout_as_tree)
+Isolated = which(degree(BF_user_user)==0)
+sum(Isolated)
+
+grafo = as_data_frame(as_edgelist(BF_user_user))
+grafo$V1 = as.integer(grafo$V1)
+grafo$V2 = as.integer(grafo$V2)
+
+write.table(grafo, "../DatosKaggle/BuzzFeed/sample/BuzzFeedUserUser_sample_20210815.csv", sep=',', row.names=FALSE, col.names=FALSE)
+```
+De 15257 nodos y 634750 links, sampleamos y nos quedamos con 3257 nodos y 24306 links

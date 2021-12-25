@@ -1,0 +1,1169 @@
+---
+title: "Análisis de Red Bipartita: Noticias - Usuarios"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r}
+library(igraph)
+```
+
+# Cargamos el dataset
+En primera medida, decidimos samplear el dataset de BuzzFeedNewsUser.txt, ya que la cantidad de nodos y links era demasiado grande para poder trabajar con el en nuestras computadoras. Este dataset cuenta con tres columnas:
+1. El id de la noticia
+2. El id del usuario
+3. Cantidad de posteos/retweets del usuario sobre esa noticia.
+
+Decidimos eliminar la columna del punto tres para simplificar el análisis. Si quisieramos profundizar el análisis, podríamos usar esta tercera columna como los pesos de la red bipartita.
+
+```{r}
+BF_news_users <- read.csv("../DatosKaggle/BuzzFeed/sample/BuzzFeedNewsUser_newshash_20210815.csv", header=FALSE, encoding = "utf-8-sig")
+BF_news_users <- BF_news_users[-1,]
+BF_news_users$V1 = as.character(BF_news_users$V1)
+g <- graph.data.frame(BF_news_users)
+```
+
+Utilizando bipartite.mapping podemos diferenciar a cada tipo de nodo. Esto requiere que inicialmente los tipos de datos que le pasemos a bipartite.mapping sean distintos. En este caso esto ya esta solucionado. Los ids de usuarios son numéricos, mientras que los ids de las noticias son un hash único creado en el procesamiento del dataset en el Jupyter Notebook.
+
+```{r}
+bipartite.mapping(g)
+V(g)$type <- bipartite_mapping(g)$type
+```
+
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "90%"}
+V(g)$color <- ifelse(V(g)$type, "lightblue", "salmon")
+V(g)$shape <- ifelse(V(g)$type, "circle", "square")
+E(g)$color <- "lightgray"
+
+plot(g, 
+     vertex.label = NA, 
+     vertex.size = 3,
+     edge.arrow.size=0.1, 
+     vertex.label.color = "black",
+     layout=layout_components)
+```
+
+Los nodos cuadrados representan los usuarios y los nodos circulares celestes representan las noticias.
+
+
+# Creación de Redes
+Utilizando bipartite_projection() creamos la red de usuarios-usuarios y de noticias-noticias
+
+user-user: Red que representa el número de usuarios que cada noticia tiene en común
+
+news-news: Red que representa el número de noticias que cada usuario tiene en común
+
+```{r}
+projection_g <- bipartite_projection(g, multiplicity = TRUE)
+
+users_projected <- projection_g$proj1
+news_projected <- projection_g$proj2
+
+```
+
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+V(news_projected)$color <- "lightblue"
+V(news_projected)$shape <- "circle"
+E(news_projected)$color <- "lightgray"
+
+plot(news_projected, 
+     vertex.label = NA, 
+     vertex.size = 3,
+     edge.arrow.size=0.1, 
+     vertex.label.color = "black",
+     layout=layout_components)
+```
+
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+V(users_projected)$color <- "salmon"
+V(users_projected)$shape <- "square"
+E(users_projected)$color <- "lightgray"
+
+plot(users_projected, 
+     vertex.label = NA, 
+     vertex.size = 3,
+     edge.arrow.size=0.1, 
+     vertex.label.color = "black",
+     layout=layout_components)
+```
+
+
+# Análisis de las redes
+
+## Proyección: Red Noticias-Noticias
+
+### Análisis de los componentes de la red
+```{r}
+connected_components = components(news_projected)
+
+connected_components
+
+connected_components$no
+connected_components$csize
+```
+
+
+###  Medidas de Centralidad Basadas en Primeros Vecinos
+
+####  Degree Centrality
+```{r}
+degree_centrality = degree(news_projected)
+
+sort(degree_centrality)
+
+max(degree_centrality)
+```
+
+El nodo con mayor degree es B4EA27, el Cuál representa a la noticia, catalogada como real, con título:  National poll: Clinton leads Trump by 6. Le siguen:
+
+- 535FB1: Barack Obama at Benjamin Netanyahu meeting: 'He is always very candid with us' (Real)
+- 581460: Sacramento mayor punches pie thrower (Real)
+- 8FFAFB: "Donald Trump: Drugs a 'Very, Very Big Factor' in Charlotte Protests" (Real)
+- A8E571: Federal Agents Make Massive Discovery at Southern Border… ISIS Is Here ⋆ Freedom Daily (Fake)
+
+```{r}
+hist(unname(degree_centrality),labels = TRUE, xlim = c(0,18), ylim = c(0,8), xlab = "Degree", main = "Histograma de los Degree")
+```
+
+A continuación graficamos la proyección de la red bipartita en función de las noticias. Cada nodo tiene asignado un color que coincide con el degree del mismo:
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "Maroon 2",
+                                 "Purple",
+                                 "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2"))
+colors <- colorfunc(max(degree_centrality))
+V(news_projected)$color <- colors[degree_centrality]
+V(news_projected)$label <- degree_centrality
+V(news_projected)$shape <- "circle"
+E(news_projected)$color <- "lightgray"
+
+plot(news_projected, 
+     vertex.size = 8,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main = "Proyección Red Noticias: Nodos según el Degree")
+```
+
+El in-degree y out-degree es el mismo dado que la red no es dirigida.
+
+####  Eigenvector Centrality
+
+Esta métrica nos da una intuición de la influencia que un nodo tiene en la red. Si un nodo es alcanzado por muchos otros nodos (que además tienen una alta eigenvector centrality) ese nodo va a tener un eigenvector centrality mayor.
+
+Podríamos decir que eigenvector centrality calcula el acceso indirecto al poder de un determinado nodo.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+eigenvector_cetrality <- evcent(news_projected)$vector
+eigenvector_cetrality
+```
+
+
+```{r}
+hist(eigenvector_cetrality, labels = TRUE, ylim = c(0,30), xlab = "Eigenvector Centrality", main = "Histograma de los Valores de Eigenvector Centrality")
+```
+
+Según este histograma, hay dos nodos que tienen un eigenvector centrality mayor a 0.8. Veamos cuales son:
+
+```{r}
+which(eigenvector_cetrality >=0.8)
+```
+
+- B4EA27:  National poll: Clinton leads Trump by 6 (Real)
+- 8FFAFB: "Donald Trump: Drugs a 'Very, Very Big Factor' in Charlotte Protests" (Real)
+
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "Maroon 2",
+                                 "Purple",
+                                 "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2"))
+scaled_eigen = (eigenvector_cetrality * 10) +1
+colors <- colorfunc(max(scaled_eigen))
+V(news_projected)$color <- colors[scaled_eigen]
+V(news_projected)$shape <- "circle"
+E(news_projected)$color <- "lightgray"
+
+plot(news_projected, 
+     vertex.label = format(round(eigenvector_cetrality, 2), nsmall = 1),
+     vertex.size = 12,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main = "Proyección Red Noticias: Nodos según el Eigenvector Centrality")
+```
+
+
+####  Pagerank Centrality
+
+```{r}
+page_rank = page.rank(news_projected)$vector
+page_rank
+```
+
+```{r}
+hist(page_rank, labels = TRUE, ylim = c(0,10), xlim = c(0,0.1), xlab = "PageRank Centrality", main = "Histograma de los Valores de PageRank Centrality")
+```
+
+Según este histograma, hay dos noticias que poseen una centralidad relativamente alta. Veamos cuales son:
+
+```{r}
+which(page_rank >= 0.08)
+```
+
+- A8E571: Federal Agents Make Massive Discovery at Southern Border… ISIS Is Here ⋆ Freedom Daily (Fake)
+- B4EA27:  National poll: Clinton leads Trump by 6 (Real)
+
+En el siguiente gáfico, graficamos la red y cada nodo tiene como label el page ranks score pero escalado, ya que es más fácil visualizar de esa forma.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "Maroon 2",
+                                 "Purple",
+                                 "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2"))
+scaled_page_rank = (page_rank * 1000) 
+colors <- colorfunc(max(scaled_page_rank))
+V(news_projected)$color <- colors[scaled_page_rank]
+V(news_projected)$shape <- "circle"
+E(news_projected)$color <- "lightgray"
+
+plot(news_projected, 
+     vertex.label = format(round(scaled_page_rank), nsmall = 1),
+     vertex.size = 12,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main = "Proyección Red Noticias: Nodos según Page Rank Score Escalado")
+```
+
+### Authorities & Hubs
+
+####  Authorities
+
+```{r}
+authority = authority.score(news_projected)$vector
+authority
+```
+
+```{r}
+hist(authority, labels = TRUE, ylim = c(0,30), xlim = c(0,1), xlab = "Authority Score", main = "Histograma de los Valores de Authority Score")
+```
+
+según este histograma, hay dos noticias que poseen un authority relativamente alta. Veamos cuales son:
+
+```{r}
+which(authority >= 0.8)
+```
+
+- B4EA27:  National poll: Clinton leads Trump by 6 (Real)
+- A8E571: Federal Agents Make Massive Discovery at Southern Border… ISIS Is Here ⋆ Freedom Daily (Fake)
+
+```{r dpi=600, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+colorfunc <- colorRampPalette(c( "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue"))
+scaled_authority = authority *1000000
+colors <- colorfunc(max(scaled_authority))
+V(news_projected)$color <- colors[scaled_authority]
+
+V(news_projected)$shape <- "circle"
+E(news_projected)$color <- "lightgray"
+
+plot(news_projected, 
+     vertex.label = format(round(authority, 2), nsmall = 1),
+     vertex.label.color = "Black",
+     vertex.size = 14,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+     main = "Proyección Red Noticias: Nodos según Authority Score")
+```
+
+####  Hubs
+
+```{r}
+hubs = hub.score(news_projected)$vector
+hubs
+```
+
+```{r}
+hist(hubs, labels = TRUE, ylim = c(0,30), xlim = c(0,1), xlab = "Hub Score", main = "Histograma de los Valores de Hub Score")
+```
+
+
+Según este histograma, hay dos noticias que poseen un authority relativamente alta. Veamos cuales son:
+
+```{r}
+which(hubs >= 0.8)
+```
+
+- B4EA27:  National poll: Clinton leads Trump by 6 (Real)
+- A8E571: Federal Agents Make Massive Discovery at Southern Border… ISIS Is Here ⋆ Freedom Daily (Fake)
+
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+colorfunc <- colorRampPalette(c( "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue"))
+scaled_hubs = hubs * 1000000
+colors <- colorfunc(max(scaled_hubs))
+V(news_projected)$color <- colors[scaled_hubs]
+
+V(news_projected)$shape <- "circle"
+E(news_projected)$color <- "lightgray"
+
+plot(news_projected, 
+     vertex.label = format(round(hubs, 2), nsmall = 1),
+     vertex.label.color = "Black",
+     vertex.size = 14,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+     main = "Proyección Red Noticias: Nodos según Hubs Score")
+```
+
+### Medidas de Centralidad Basadas en Caminos más Cortos
+
+### Closeness Centrality
+
+```{r}
+closeness_centrality = closeness(news_projected)
+closeness_centrality
+
+hist(closeness_centrality, labels = TRUE, ylim = c(0,11), xlim = c(0.004,0.014), xlab = "Closeness Centrality", main = "Histograma de los Valores de Closeness Centrality")
+```
+
+Graficamos a continuación la red de noticias-noticias donde cada nodo tiene el tamaño y color asociado a la métrica de closeness calculada anteriormente.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+colorfunc <- colorRampPalette(c( "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue"))
+scaled_closeness = closeness_centrality * 1000
+colors <- colorfunc(max(scaled_closeness))
+V(news_projected)$color <- colors[scaled_closeness]
+
+V(news_projected)$shape <- "circle"
+E(news_projected)$color <- "lightgray"
+
+plot(news_projected, 
+     vertex.label = format(round(closeness_centrality, 4), nsmall = 1),
+     vertex.labe.color = "black",
+     vertex.size =  closeness_centrality *1000 / 2,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+     main = "Proyección Red Noticias: Nodos Según Closeness Centrality")
+
+plot(news_projected, 
+     vertex.label = NA,
+     vertex.size =  closeness_centrality *1000 / 2,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+     main = "Proyección Red Noticias: Nodos Según Closeness Centrality")
+```
+
+## Betweenness Centrality
+
+```{r}
+betweenness_centrality <- betweenness(news_projected)
+betweenness_centrality
+hist(betweenness_centrality, bins= 20, labels = TRUE, ylim = c(0,40), xlim = c(0,300), xlab = "Betweenness Centrality", main = "Histograma de los Valores de Betweenness Centrality")
+```
+
+```{r}
+which(betweenness_centrality >= 100)
+``` 
+
+- A8E571: Federal Agents Make Massive Discovery at Southern Border… ISIS Is Here ⋆ Freedom Daily (Fake)
+- 535FB1: Barack Obama at Benjamin Netanyahu meeting: 'He is always very candid with us' (Real)
+
+Graficamos a continuación la red de noticias-noticias donde cada nodo tiene el tamaño y color asociado a la métrica de betweenness calculada anteriormente.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+colorfunc <- colorRampPalette(c( "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue"))
+scaled_betweenness = betweenness_centrality + 1
+colors <- colorfunc(max(scaled_betweenness))
+V(news_projected)$color <- colors[scaled_betweenness]
+V(news_projected)$shape <- "circle"
+E(news_projected)$color <- "lightgray"
+
+plot(news_projected, 
+     vertex.label = format(round(betweenness_centrality), nsmall = 1),
+     vertex.size =  betweenness_centrality / 9,
+     edge.arrow.size=0.1,
+     layout = layout_nicely,
+     main = "Proyección Red Noticias: Nodos Según Betweenness Centrality")
+
+plot(news_projected, 
+     vertex.label = NA,
+     vertex.size =  betweenness_centrality / 9,
+     edge.arrow.size=0.1,
+     layout = layout_nicely,
+     main = "Proyección Red Noticias: Nodos Según Betweenness Centrality")
+```
+
+### Medidas Sobre Conjuntos de Nodos
+
+#### Cliques
+
+Cálculo de la distribución de cliques:
+
+```{r}
+count_max_cliques(news_projected)
+```
+La red contiene 66 cliques.
+
+¿Cuál es el tamaño de cada clique?
+
+```{r }
+total_cliques = max_cliques(news_projected) 
+cliques_sizes = unlist(lapply(total_cliques, length))
+h = hist(cliques_sizes, 
+         ylim=c(0,40),
+         breaks = 5,
+         xlab = "Tamaño de los cliques", 
+         ylab = "Frecuencia", 
+         main = "Distribución del tamaño de los cliques" ) 
+
+text(h$mids,h$counts,labels=h$counts, adj=c(0.5, -0.5))
+
+```
+
+Graficamos el clique más grande
+
+```{r fig.height=6, fig.width=12}
+largestCliques <- largest_cliques(news_projected)
+
+largestClique_1 = largestCliques[[1]]
+g_induced = induced_subgraph(news_projected, largestClique_1)
+V(g_induced)$color <- "lightblue"
+
+plot(g_induced,
+     vertex.label = NA,
+     layout=layout_components,
+     edge.arrow.size=0.05,
+     vertex.size = 10,
+     main = "Clique Más Grande")
+```
+
+### Medidas Globales
+
+#### Radio
+Calculado obteniendo el mínimo valor de eccentricity
+```{r}
+eccentricity_metric = eccentricity(news_projected)
+min(eccentricity_metric)
+```
+
+#### Diametro
+```{r}
+diameter_metric = diameter(news_projected)
+diameter_metric
+```
+
+#### Average Path Length
+```{r}
+avg_path_length = mean_distance(news_projected, directed=F)
+avg_path_length
+```
+
+#### Transitivity
+```{r}
+clustering_avg = transitivity(news_projected, type = "average")
+clustering_avg
+```
+
+#### Coeficiente de Reciprocidad 
+```{r}
+reciprocity(news_projected)
+```
+
+# Subredes
+
+## K-Core
+La función coreness nos da una tabla indicando que core pertenece a cada nodo:
+
+```{r}
+coreness(news_projected)
+```
+
+En este gráfico podemos observar la red noticia-noticia. Cada nodo tiene un atributo asignado que es el K-core obtenido mediante la función de coreness. Además, cada nodo tiene asociado un color en función del valor del k-core. Los nodos con valores más altos, son los que están más densamente conectados.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+kcore <- coreness(news_projected)    # Extraemos k-cores
+V(news_projected)$core <- kcore      # Agregamos los k-cores calculados como atributo de los nodos
+
+colorfunc <- colorRampPalette(c( "Red 2",
+                                 "lightcoral",
+                                 "tomato", 
+                                 "orange",
+                                 "Cadet Blue 1",
+                                 "Yellow 3",
+                                 "gold", 
+                                 "lightgreen",
+                                 "Light Steel Blue 2",
+                                 "Royal Blue 1",
+                                 "Deep Sky Blue 1",
+                                 "Slate Blue"))
+colors <- colorfunc(max(kcore))
+V(news_projected)$color <- colors[kcore]
+
+plot(news_projected, 
+     vertex.label = kcore,
+     vertex.size = 15,
+     layout = layout_components,
+     main = " Nodos Según El core al que Pertenecen")
+```
+
+
+```{r fig.height=6, fig.width=12}
+egog = make_ego_graph(news_projected, order=1)
+k_g = egog[[1]]
+degree_k_g = degree(k_g)
+
+colorfunc <- colorRampPalette(c( "Red 2",
+                                 "lightcoral",
+                                 "tomato", 
+                                 "orange",
+                                 "Cadet Blue 1",
+                                 "Yellow 3",
+                                 "gold", 
+                                 "lightgreen",
+                                 "Light Steel Blue 2",
+                                 "Royal Blue 1",
+                                 "Deep Sky Blue 1",
+                                 "Slate Blue"))
+scaled_degree = degree_k_g + 1
+colors <- colorfunc(max(scaled_degree))
+V(k_g)$color <- colors[scaled_degree]
+
+
+plot(k_g, 
+     vertex.size = 12,
+     vertex.label = degree_k_g,
+     edge.arrow.size=0.3,
+     layout = layout_components,
+     main = "Subgrafo Inducido Usuario-Usuario: Nodos Según Degree")
+
+```
+
+```{r}
+rm(news_projected)
+```
+
+
+## Proyección: Red Usuarios
+
+### Análisis de los componentes de la red
+```{r}
+connected_components = components(users_projected)
+
+connected_components
+
+connected_components$no
+connected_components$csize
+
+
+```
+
+
+###  Medidas de Centralidad Basadas en Primeros Vecinos
+
+####  Degree Centrality
+```{r}
+degree_centrality = degree(users_projected)
+
+sort(degree_centrality)
+
+max(degree_centrality)
+```
+
+```{r}
+hist(unname(degree_centrality),labels = TRUE, xlim = c(0,600), ylim = c(0,350), xlab = "Degree", main = "Histograma de los Degree")
+```
+
+A continuación graficamos la proyección de la red bipartita en función de los usuarios. Cada nodo tiene asignado un color que coincide con el degree del mismo:
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "Maroon 2",
+                                 "Purple",
+                                 "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2"))
+colors <- colorfunc(max(degree_centrality))
+V(users_projected)$color <- colors[degree_centrality]
+V(users_projected)$label <- degree_centrality
+V(users_projected)$shape <- "circle"
+E(users_projected)$color <- "lightgray"
+
+plot(users_projected, 
+     vertex.size = 2,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main = "Proyección Red Usuarios: Nodos Según Degree")
+
+plot(users_projected, 
+     vertex.size = 4,
+     vertex.label = NA,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main = "Proyección Red Usuarios: Nodos Según Degree")
+```
+
+####  Eigenvector Centrality
+
+Esta métrica nos da una intuición de la influencia que un nodo tiene en la red. Si un nodo es alcanzado por muchos otros nodos (que además tienen una alta eigenvector centrality) ese nodo va a tener un eigenvector centrality mayor.
+
+Podríamos decir que eigenvector centrality calcula el acceso indirecto al poder de un determinado nodo.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+eigenvector_cetrality <- evcent(users_projected)$vector
+eigenvector_cetrality
+```
+
+
+```{r}
+hist(eigenvector_cetrality, labels = TRUE, ylim = c(0,1000), xlab = "Eigenvector Centrality", main = "Histograma de los Valores de Eigenvector Centrality")
+```
+
+Según este histograma, hay nodos que tienen un eigenvector centrality mayor a 0.8. Veamos Cuáles son:
+
+```{r}
+which(eigenvector_cetrality >=0.8)
+```
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "Maroon 2",
+                                 "Purple",
+                                 "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2"))
+scaled_eigen = (eigenvector_cetrality * 100) + 1
+colors <- colorfunc(max(scaled_eigen))
+V(users_projected)$color <- colors[scaled_eigen]
+V(users_projected)$shape <- "circle"
+E(users_projected)$color <- "lightgray"
+
+plot(users_projected, 
+     vertex.label = format(round(eigenvector_cetrality, 2), nsmall = 1),
+     vertex.size = 3,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main = "Proyección Red Noticias: Nodos según el Eigenvector Centrality")
+
+plot(users_projected, 
+     vertex.label = NA,
+     vertex.size = 3,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main = "Proyección Red Usuarios: Nodos según el Eigenvector Centrality")
+```
+
+####  Page Rank Centrality
+
+```{r}
+page_rank = page.rank(users_projected)$vector
+page_rank
+```
+
+```{r}
+hist(page_rank, labels = TRUE, ylim = c(0,500), xlim = c(0,0.005), xlab = "PageRank Centrality", main = "Histograma de los Valores de PageRank Centrality")
+```
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+colorfunc <- colorRampPalette(c( "Medium Slate Blue",
+                                 "Magenta",
+                                 "Maroon 2",
+                                 "Purple",
+                                 "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue",
+                                 "Light Steel Blue 1",
+                                 "Royal Blue 2"))
+scaled_page_rank = (page_rank * 1000) + 1
+colors <- colorfunc(max(scaled_page_rank))
+V(users_projected)$color <- colors[scaled_page_rank]
+V(users_projected)$shape <- "circle"
+E(users_projected)$color <- "lightgray"
+
+plot(users_projected, 
+     vertex.label = format(round(scaled_page_rank), nsmall = 1),
+     vertex.size = 2,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main = "Proyección Red Usuarios: Nodos según Page Rank Score Escalado")
+
+plot(users_projected, 
+     vertex.label = NA,
+     vertex.size = 3,
+     edge.arrow.size=0.1,
+     layout=layout_components,
+     main = "Proyección Red Usuarios: Nodos según Page Rank Score Escalado")
+```
+
+### Authorities & Hubs
+
+####  Authorities
+
+```{r}
+authority = authority.score(users_projected)$vector
+authority
+```
+
+```{r}
+hist(authority, labels = TRUE, ylim = c(0,800), xlim = c(0,1), xlab = "Authority Score", main = "Histograma de los Valores de Authority Score")
+```
+Cuales son los usuarios con authority score mayor a 0.8:
+
+```{r}
+which(authority >= 0.8)
+```
+
+```{r dpi=600, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+colorfunc <- colorRampPalette(c( "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue"))
+scaled_authority = authority *1000000 + 1
+colors <- colorfunc(max(scaled_authority))
+V(users_projected)$color <- colors[scaled_authority]
+
+V(users_projected)$shape <- "circle"
+E(users_projected)$color <- "lightgray"
+
+plot(users_projected, 
+     vertex.label = format(round(authority, 2), nsmall = 1),
+     vertex.label.color = "Black",
+     vertex.size = 3,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+     main = "Proyección Red Usuarios: Nodos según Authority Score")
+
+plot(users_projected, 
+     vertex.label = NA,
+     vertex.label.color = "Black",
+     vertex.size = 3,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+     main = "Proyección Red Usuarios: Nodos según Authority Score")
+```
+
+####  Hubs
+
+```{r}
+hubs = hub.score(users_projected)$vector
+hubs
+```
+
+```{r}
+hist(hubs, labels = TRUE, ylim = c(0,800), xlim = c(0,1), xlab = "Hub Score", main = "Histograma de los Valores de Hub Score")
+```
+
+Cuales son los usuarios con alto hub score:
+
+```{r}
+which(hubs >= 0.8)
+```
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+colorfunc <- colorRampPalette(c( "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue"))
+scaled_hubs = hubs * 1000000 + 1
+colors <- colorfunc(max(scaled_hubs))
+V(users_projected)$color <- colors[scaled_hubs]
+
+V(users_projected)$shape <- "circle"
+E(users_projected)$color <- "lightgray"
+
+plot(users_projected, 
+     vertex.label = format(round(hubs, 2), nsmall = 1),
+     vertex.label.color = "Black",
+     vertex.size = 3,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+     main = "Proyección Red Usuarios: Nodos según Hub Score")
+
+plot(users_projected, 
+     vertex.label = NA,
+     vertex.label.color = "Black",
+     vertex.size = 3,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+     main = "Proyección Red Usuarios: Nodos según Hub Score")
+```
+
+### Medidas de Centralidad Basadas en Caminos más Cortos
+
+### Closeness Centrality
+
+```{r}
+closeness_centrality = closeness(users_projected)
+closeness_centrality
+```
+
+```{r}
+hist(closeness_centrality, labels = TRUE, ylim = c(0,700), xlab = "Closeness Centrality", main = "Histograma de los Valores de Closeness Centrality")
+```
+
+Graficamos a continuación la red de usuarios - usuarios donde cada nodo tiene el tamaño y color asociado a la métrica de closeness calculada anteriormente.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+colorfunc <- colorRampPalette(c( "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue"))
+scaled_closeness = closeness_centrality * 10000
+colors <- colorfunc(max(scaled_closeness))
+V(users_projected)$color <- colors[scaled_closeness]
+
+V(users_projected)$shape <- "circle"
+E(users_projected)$color <- "lightgray"
+
+plot(users_projected, 
+     vertex.label = format(round(closeness_centrality, 2), nsmall = 1),
+     vertex.size =  closeness_centrality *1000 / 2,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+    main = "Proyección Red Usuarios: Nodos según Closeness Centrality")
+
+plot(users_projected, 
+     vertex.label = NA,
+     vertex.size =  closeness_centrality *1000 / 2,
+     edge.arrow.size=0.1,
+     layout = layout_components,
+    main = "Proyección Red Usuarios: Nodos según Closeness Centrality")
+```
+
+## Betweenness Centrality
+```{r}
+betweenness_centrality <- betweenness(users_projected)
+betweenness_centrality
+```
+
+```{r}
+hist(betweenness_centrality, labels = TRUE, ylim = c(0,2000), xlim = c(0,250000), xlab = "Betweenness Centrality", main = "Histograma de los Valores de Betweenness Centrality")
+```
+
+
+Graficamos a continuación la red de usuarios-usuarios donde cada nodo tiene el tamaño y color asociado a la métrica de betweenness calculada anteriormente.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+
+colorfunc <- colorRampPalette(c( "red",
+                                 "firebrick",
+                                 "lightcoral",
+                                 "saddlebrown",
+                                 "tomato", 
+                                 "darkorange",
+                                 "gold", 
+                                 "lightgreen",
+                                 "mediumspringgreen",
+                                 "dodgerblue",
+                                 "steelblue"))
+scaled_betweenness = (betweenness_centrality/1000) +1
+colors <- colorfunc(max(scaled_betweenness))
+V(users_projected)$color <- colors[scaled_betweenness]
+V(users_projected)$shape <- "circle"
+E(users_projected)$color <- "lightgray"
+
+plot(users_projected, 
+     vertex.label = NA,
+     vertex.size =  scaled_betweenness,
+     edge.arrow.size=0.1,
+     layout = layout_nicely,
+     main = "Proyeccion Red Usuarios- Nodos Según el Betweenness")
+```
+
+### Medidas Sobre Conjuntos de Nodos
+
+#### Cliques
+
+Cálculo de la distribución de cliques:
+
+```{r}
+count_max_cliques(users_projected)
+```
+
+La red contiene 79 cliques.
+
+¿Cuál es el tamaño de cada clique?
+
+```{r }
+total_cliques = max_cliques(users_projected) 
+cliques_sizes = unlist(lapply(total_cliques, length))
+h = hist(cliques_sizes, 
+         ylim=c(0,80),
+         breaks = 5,
+         xlab = "Tamaño de los cliques", 
+         ylab = "Frecuencia", 
+         main = "Distribución del tamaño de los cliques" ) 
+
+text(h$mids,h$counts,labels=h$counts, adj=c(0.5, -0.5))
+
+```
+
+Graficamos el clique más grande:
+
+```{r fig.height=6, fig.width=12}
+largestCliques <- largest_cliques(users_projected)
+
+largestClique_1 = largestCliques[[1]]
+g_induced = induced_subgraph(users_projected, largestClique_1)
+V(g_induced)$color <- "lightblue"
+
+plot(g_induced,
+     vertex.label = NA,
+     layout=layout_components,
+     edge.arrow.size=0.05,
+     vertex.size = 10)
+```
+
+### Medidas Globales
+
+#### Radio
+Calculado obteniendo el mínimo valor de eccentricity
+
+```{r}
+eccentricity_metric = eccentricity(users_projected)
+min(eccentricity_metric)
+```
+
+#### Diametro
+```{r}
+diameter_metric = diameter(users_projected)
+diameter_metric
+```
+
+#### Average Path Length
+```{r}
+avg_path_length = mean_distance(users_projected, directed=F)
+avg_path_length
+```
+
+#### Clustering Promedio
+```{r}
+clustering_avg = transitivity(users_projected, type = "average")
+clustering_avg
+```
+
+#### Coeficiente de Reciprocidad 
+```{r}
+reciprocity(users_projected)
+```
+
+# Subredes
+
+## K-Core
+La función coreness nos da una tabla indicando que core pertenece a cada nodo:
+
+```{r}
+coreness(users_projected)
+```
+
+En este gráfico podemos observar la red usuarios-usuarios. Cada nodo tiene un atributo asignado que es el K-core obtenido mediante la función de coreness. Además, cada nodo tiene asociado un color en función del valor del k-core. Los nodos con valores más altos, son los nodos que están más densamente conectados.
+
+```{r dpi=400, fig.width=7, fig.height=7, out.width = "100%", out.height = "100%"}
+kcore <- coreness(users_projected)    # Extraemos k-cores
+V(users_projected)$core <- kcore      # Agregamos los k-cores calculados como atributo de los nodos
+
+colorfunc <- colorRampPalette(c( "Red 2",
+                                 "lightcoral",
+                                 "tomato", 
+                                 "orange",
+                                 "Cadet Blue 1",
+                                 "Yellow 3",
+                                 "gold", 
+                                 "lightgreen",
+                                 "Light Steel Blue 2",
+                                 "Royal Blue 1",
+                                 "Deep Sky Blue 1",
+                                 "Slate Blue"))
+colors <- colorfunc(max(kcore))
+V(users_projected)$color <- colors[kcore]
+
+plot(users_projected, 
+     vertex.size = 3,
+     layout = layout_components,
+     main="Proyeccion Red Usuarios - Nodos Según el Core al que Pertenecen")
+
+plot(users_projected, 
+     vertex.label=NA,
+     vertex.size = 3,
+     layout = layout_components,
+     main="Proyeccion Red Usuarios - Nodos Según el Core al que Pertenecen")
+```
+
+
+```{r fig.height=6, fig.width=12}
+egog = make_ego_graph(users_projected, order=2)
+k_g = egog[[1]]
+degree_k_g = degree(k_g)
+
+colorfunc <- colorRampPalette(c( "Red 2",
+                                 "lightcoral",
+                                 "tomato", 
+                                 "orange",
+                                 "Cadet Blue 1",
+                                 "Yellow 3",
+                                 "gold", 
+                                 "lightgreen",
+                                 "Light Steel Blue 2",
+                                 "Royal Blue 1",
+                                 "Deep Sky Blue 1",
+                                 "Slate Blue"))
+scaled_degree = degree_k_g + 1
+colors <- colorfunc(max(scaled_degree))
+V(k_g)$color <- colors[scaled_degree]
+
+
+plot(k_g, 
+     vertex.size = 3,
+     vertex.label = degree_k_g,
+     edge.arrow.size=0.3,
+     layout = layout_components,
+     main = "Subgrafo Inducido: Nodos Según Degree")
+
+plot(k_g, 
+     vertex.size = 3,
+     vertex.label = NA,
+     edge.arrow.size=0.3,
+     layout = layout_components,
+     main = "Subgrafo Inducido: Nodos Según Degree")
+```

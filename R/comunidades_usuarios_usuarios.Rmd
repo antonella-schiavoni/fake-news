@@ -1,0 +1,109 @@
+---
+title: "Análisis de Comunidades"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r}
+library(igraph)
+```
+
+# Cargamos el dataset
+```{r}
+BF_user_user_table <- read.table("../DatosKaggle/BuzzFeed/sample/BuzzFeedUserUser_sample_20210815.csv", sep = ",")
+
+BF_user_user <- graph.data.frame(BF_user_user_table, directed = FALSE)
+
+length(V(BF_user_user))
+length(E(BF_user_user))
+```
+
+# Métodos basados en maximizar una función objetivo
+
+## Greedy optimization de la modularidad
+```{r Fig2, echo=TRUE, fig.height=6, fig.width=20}
+#c1 = cluster_fast_greedy(BF_user_user)
+#plot(c1, BF_user_user)
+#plot_dendrogram(c1)
+```
+
+Vamos a excluir a este algoritmo del analisis dado que nuestra red tiene multiples links. - Podriamos usar la funcion simplify para quitarlos, pero consideramos que no es apropiado. -
+
+
+
+## Optimización basada en autovectores
+
+```{r}
+c2 = cluster_leading_eigen(BF_user_user) 
+```
+
+```{r}
+hist(c2$membership)
+length(unique(c2$membership))
+c2$modularity
+dendPlot(c2, mode="hclust", rect = 5) 
+```
+
+
+## Optimización en dos epatapas: Louvain algorithm 
+
+```{r}
+c3 = cluster_louvain(BF_user_user) 
+```
+
+```{r}
+hist(c3$membership)
+length(c3$membership)
+c3$modularity
+```
+
+# Métodos divisivos basados en centralidad de nodos o links
+
+## Algoritmo Newman-Girvan
+Decidimos no incluir en el análisis el método de Newman-Girvan dado que no fue posible correr el algoritmo en nuestras computadoras
+
+```{r}
+#c4 = cluster_edge_betweenness(BF_user_user) 
+#dendPlot(c4, mode="hclust") 
+#plot(c4, BF_user_user) 
+```
+
+# Método de propagación de etiquetas
+```{r}
+c5 = cluster_label_prop(BF_user_user)
+hist(c5$membership)
+length(c5$membership)
+c5$modularity
+plot(c5, BF_user_user, layout=layout_components, vertex.label= NA, edge.arrow.size=0.02,vertex.size = 0.5)
+```
+
+```{r}
+c6 <- walktrap.community(BF_user_user, steps = 4, modularity = TRUE)
+dendogram_network <- as.dendrogram(c6)
+plot(dendogram_network, main = "Dendrogram for Walktrap Community")
+```
+En general, los gráficos mostrados anteriormente no aportan mucha informacion visual como para detectar que tan bien funciona cada método. Como resumen, los métodos aplicados detectaron las siguientes comunidades:
+
+- cluster leading eigen: 16
+- cluster louvain: 25
+- cluster label prop:32
+- walktrap.community: 87
+
+```{r}
+# Guardamos en un dataframe los resultados de los clusters
+
+results = data.frame(user_id = V(BF_user_user)$name,
+                     leading_eigen = c2$membership,
+                     cluster_louvain = c3$membership,
+                     label_proagation = c5$membership,
+                     randomw_walktrap = c6$membership
+                     )
+
+write.table(results,
+            "../DatosKaggle/BuzzFeed/sample/ClusterResults.csv",
+            sep=',', 
+            row.names=FALSE, 
+            col.names=TRUE)
+```
