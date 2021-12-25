@@ -1,0 +1,13 @@
+name: TwitterNetworkAnalysis
+title: TwitterNetworkAnalysis
+username:
+account: antonellaschiavoni
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4522616
+bundleId: 4955793
+url: https://antonellaschiavoni.shinyapps.io/TwitterNetworkAnalysis/
+when: 1629763206.70568
+lastSyncTime: 1629763206.7057
+asMultiple: FALSE
+asStatic: FALSE
