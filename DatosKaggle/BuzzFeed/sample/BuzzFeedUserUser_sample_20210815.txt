@@ -1,0 +1,22 @@
+curl --location --request POST 'http://0.0.0.0:8087/rpc/com.asapp.schemas.product.conversation_summary.services.ConversationSummary/SummarizeConversation' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "header": {
+        "client": {
+            "type": 2
+        },
+        "meta": {
+            "company": {
+                "id": "tmobile"
+            }
+        }
+    },
+    "query": {
+        "conversation":{
+                    "events": [{"text": "I have a problem with my bill",
+                                    "is_from_customer": true}
+                                    ]
+                                },
+        "max_num_summaries": 3
+    }
+}'
